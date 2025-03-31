@@ -1,0 +1,93 @@
+package org.example.orderservice.dtos;
+
+import org.example.orderservice.models.Order;
+import org.example.orderservice.models.OrderItem;
+import org.example.orderservice.models.ShippingAddress;
+
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class OrderResponseDTO {
+    private Long orderId;
+    private String userId;
+    private Date orderDate;
+    private String status;
+    private ShippingAddressDTO shippingAddress;
+    private List<OrderItemDTO> orderItems;
+
+    public OrderResponseDTO() { }
+
+    // Getters and setters
+
+    public Long getOrderId() {
+        return orderId;
+    }
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+    public String getUserId() {
+        return userId;
+    }
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+    public Date getOrderDate() {
+        return orderDate;
+    }
+    public void setOrderDate(Date orderDate) {
+        this.orderDate = orderDate;
+    }
+    public String getStatus() {
+        return status;
+    }
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    public ShippingAddressDTO getShippingAddress() {
+        return shippingAddress;
+    }
+    public void setShippingAddress(ShippingAddressDTO shippingAddress) {
+        this.shippingAddress = shippingAddress;
+    }
+    public List<OrderItemDTO> getOrderItems() {
+        return orderItems;
+    }
+    public void setOrderItems(List<OrderItemDTO> orderItems) {
+        this.orderItems = orderItems;
+    }
+
+    /**
+     * Converts an Order model to an OrderResponse DTO.
+     */
+    public static OrderResponseDTO fromOrder(Order order) {
+        OrderResponseDTO response = new OrderResponseDTO();
+        response.setOrderId(order.getId());
+        response.setUserId(order.getUserId());
+        response.setOrderDate(order.getOrderDate());
+        response.setStatus(order.getStatus().name()); // Using the name of the enum
+
+        // Map shipping address
+        ShippingAddress sa = order.getShippingAddress();
+        ShippingAddressDTO shipping = new ShippingAddressDTO();
+        shipping.setStreet(sa.getStreet());
+        shipping.setCity(sa.getCity());
+        shipping.setState(sa.getState());
+        shipping.setZipCode(sa.getZipCode());
+        response.setShippingAddress(shipping);
+
+        // Map each OrderItem into OrderItemDTO
+        List<OrderItemDTO> items = order.getOrderItems().stream().map(item -> {
+            OrderItemDTO dto = new OrderItemDTO();
+            dto.setProductId(item.getProductId());
+            dto.setProductName(item.getProductName());
+            dto.setQuantity(item.getQuantity());
+            dto.setUnitPrice(item.getUnitPrice());
+            dto.setCurrency(item.getCurrency());
+            return dto;
+        }).collect(Collectors.toList());
+        response.setOrderItems(items);
+
+        return response;
+    }
+}
