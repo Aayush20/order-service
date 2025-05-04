@@ -1,43 +1,18 @@
-//package org.example.orderservice.services;
-//
-//import org.example.orderservice.dtos.ProductDTO;
-//import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.stereotype.Service;
-//import org.springframework.web.client.RestTemplate;
-//
-//@Service
-//public class ProductClient {
-//
-//    private final RestTemplate restTemplate;
-//
-//    @Value("${product.service.url}")
-//    private String productServiceUrl;  // Example: http://localhost:8081
-//
-//    public ProductClient(RestTemplate restTemplate) {
-//        this.restTemplate = restTemplate;
-//    }
-//
-//    /**
-//     * Retrieves product details by product ID.
-//     */
-//    public ProductDTO getProductDetails(Long productId) {
-//        String url = productServiceUrl + "/products/" + productId;
-//        return restTemplate.getForObject(url, ProductDTO.class);
-//    }
-//}
-//
-//
 package org.example.orderservice.services;
 
+import io.github.resilience4j.retry.annotation.Retry;
 import org.example.orderservice.dtos.ProductDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
-import java.math.BigDecimal;
 
 @Service
 public class ProductClient {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProductClient.class);
 
     private final RestTemplate restTemplate;
     private final String productServiceUrl;
@@ -48,20 +23,15 @@ public class ProductClient {
         this.productServiceUrl = productServiceUrl;
     }
 
+    @Retry(name = "productService", fallbackMethod = "fallbackProductDetails")
     public ProductDTO getProductDetails(Long productId) {
-        // Check if we're in dummy mode.
-        if ("dummy".equalsIgnoreCase(productServiceUrl)) {
-            ProductDTO dummyProduct = new ProductDTO();
-            dummyProduct.setProductId(productId);
-            dummyProduct.setName("Dummy Product");
-            // Set display unit price as 50.00 (for order service display).
-            dummyProduct.setPrice(BigDecimal.valueOf(50.00));
-            dummyProduct.setCurrency("USD");
-            return dummyProduct;
-        }
-        // Otherwise, if a real service URL is provided, proceed with real REST call.
         String url = productServiceUrl + "/products/" + productId;
         return restTemplate.getForObject(url, ProductDTO.class);
     }
-}
 
+    // Fallback method in case retries fail
+    public ProductDTO fallbackProductDetails(Long productId, Throwable ex) {
+        logger.error("❗ Fallback: Unable to fetch product details for id {} after retries. Error: {}", productId, ex.getMessage());
+        throw new RuntimeException("Product service is unavailable. Please try again later.");
+    }
+}

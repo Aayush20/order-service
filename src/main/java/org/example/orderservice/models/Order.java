@@ -1,13 +1,17 @@
 package org.example.orderservice.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 @Entity
 @Table(name = "orders") // "order" is a reserved keyword in SQL
-public class Order extends BaseEntity {
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+public class Order extends BaseEntity implements Serializable {
 
     @Column(nullable = false)
     private String userId;
