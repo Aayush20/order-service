@@ -2,6 +2,7 @@ package org.example.orderservice.configs;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -23,6 +24,11 @@ public class OrderServiceSecurityConfig {
                                 "/api-docs/**",
                                 "/actuator/**"
                         ).permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/orders/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/orders/place").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/orders/cancel/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/orders/status/**").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

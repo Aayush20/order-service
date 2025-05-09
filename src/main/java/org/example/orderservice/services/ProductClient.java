@@ -25,7 +25,8 @@ public class ProductClient {
 
     @Retry(name = "productService", fallbackMethod = "fallbackProductDetails")
     public ProductDTO getProductDetails(Long productId) {
-        String url = productServiceUrl + "/products/" + productId;
+        //String url = productServiceUrl + "/products/" + productId;
+        String url = "http://prod-cat-service/products/" + productId;
         return restTemplate.getForObject(url, ProductDTO.class);
     }
 
