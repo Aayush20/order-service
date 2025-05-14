@@ -1,12 +1,20 @@
 package org.example.orderservice.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.orderservice.models.OrderAuditLog;
 
 import java.time.Instant;
 
+@Schema(description = "Log of actions taken on an order")
 public class OrderAuditLogDTO {
+
+    @Schema(description = "Who performed the action", example = "order-service")
     private String performedBy;
+
+    @Schema(description = "Audit log action", example = "ORDER_PLACED")
     private String action;
+
+    @Schema(description = "Timestamp of the action", example = "2024-05-04T12:00:00Z")
     private Instant timestamp;
 
     public OrderAuditLogDTO() {

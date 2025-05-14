@@ -1,14 +1,30 @@
 package org.example.orderservice.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "User profile and address details")
 public class UserProfileDTO {
+
+    @Schema(description = "Full name of the user", example = "Aayush Kumar")
     private String name;
+
+    @Schema(description = "Email address", example = "aayush@example.com")
     private String email;
+
+    @Schema(description = "User's saved address")
     private AddressDTO address;
 
     public static class AddressDTO {
+        @Schema(description = "Street address", example = "123 Elm Street")
         private String street;
+
+        @Schema(description = "City name", example = "Bangalore")
         private String city;
+
+        @Schema(description = "State name", example = "Karnataka")
         private String state;
+
+        @Schema(description = "Zip or postal code", example = "560001")
         private String zipCode;
 
         // Getters and Setters

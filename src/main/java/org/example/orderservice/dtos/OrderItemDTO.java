@@ -7,19 +7,19 @@ import java.math.BigDecimal;
 @Schema(description = "Represents an individual item in an order")
 public class OrderItemDTO {
 
-    @Schema(example = "2001")
+    @Schema(description = "Product ID", example = "2001")
     private Long productId;
 
-    @Schema(example = "AirPods Pro")
+    @Schema(description = "Product name", example = "AirPods Pro")
     private String productName;
 
-    @Schema(example = "2")
+    @Schema(description = "Quantity ordered", example = "2")
     private int quantity;
 
-    @Schema(example = "249.99")
+    @Schema(description = "Price per item", example = "249.99")
     private BigDecimal unitPrice;
 
-    @Schema(example = "USD")
+    @Schema(description = "Currency code", example = "USD")
     private String currency;
 
     public Long getUnitPriceInMinorUnits() {

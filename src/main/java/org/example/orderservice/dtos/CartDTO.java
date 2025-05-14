@@ -7,46 +7,21 @@ import org.example.orderservice.models.CartItem;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Schema(
-        name = "CartDTO",
-        description = "User's cart with product items",
-        example = """
-    {
-      "userId": "user123",
-      "items": [
-        {
-          "productId": 101,
-          "productName": "iPhone 15",
-          "quantity": 2,
-          "unitPrice": 999.99,
-          "currency": "USD"
-        }
-      ]
-    }
-    """
-)
+@Schema(description = "User's cart with product items")
 public class CartDTO {
 
     @Schema(description = "User ID", example = "user123")
     private String userId;
 
-    @Schema(description = "Items in the cart")
+    @Schema(description = "Items present in the cart")
     private List<CartItemDTO> items;
 
-    public String getUserId() {
-        return userId;
-    }
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-    public List<CartItemDTO> getItems() {
-        return items;
-    }
-    public void setItems(List<CartItemDTO> items) {
-        this.items = items;
-    }
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
-    // ✅ Static factory method for mapping
+    public List<CartItemDTO> getItems() { return items; }
+    public void setItems(List<CartItemDTO> items) { this.items = items; }
+
     public static CartDTO fromEntity(Cart cart) {
         CartDTO dto = new CartDTO();
         dto.setUserId(cart.getUserId());

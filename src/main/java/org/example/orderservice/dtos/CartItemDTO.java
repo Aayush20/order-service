@@ -6,29 +6,28 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
-@Schema(description = "Represents an item inside the cart")
+@Schema(description = "Item inside the cart")
 public class CartItemDTO {
 
     @NotNull(message = "Product ID is required")
-    @Schema(example = "101")
+    @Schema(description = "Product ID", example = "101")
     private Long productId;
 
     @NotNull
-    @Schema(example = "iPhone 15")
+    @Schema(description = "Product name", example = "iPhone 15")
     private String productName;
 
     @Min(value = 1, message = "Quantity must be at least 1")
-    @Schema(example = "2")
+    @Schema(description = "Quantity of the product", example = "2")
     private int quantity;
 
     @NotNull(message = "Unit price is required")
-    @Schema(example = "499.99")
+    @Schema(description = "Unit price", example = "999.99")
     private BigDecimal unitPrice;
 
     @NotNull(message = "Currency is required")
-    @Schema(example = "USD")
+    @Schema(description = "Currency code", example = "USD")
     private String currency;
-
 
     public CartItemDTO() {
     }

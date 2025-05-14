@@ -8,11 +8,11 @@ import jakarta.validation.constraints.NotNull;
 public class CartItemRequestDTO {
 
     @NotNull(message = "Product ID is required")
-    @Schema(example = "1001")
+    @Schema(description = "Product ID", example = "1001")
     private Long productId;
 
     @Min(value = 1, message = "Quantity must be at least 1")
-    @Schema(example = "3")
+    @Schema(description = "Quantity to add", example = "3")
     private int quantity;
 
     public CartItemRequestDTO() {

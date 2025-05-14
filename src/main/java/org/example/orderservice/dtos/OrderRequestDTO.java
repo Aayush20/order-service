@@ -11,7 +11,7 @@ import java.util.List;
 public class OrderRequestDTO {
 
     @NotNull(message = "User ID is required")
-    @Schema(description = "ID of the user placing the order", example = "123")
+    @Schema(description = "User ID placing the order", example = "123")
     private Long userId;
 
     @Valid
@@ -20,7 +20,7 @@ public class OrderRequestDTO {
     private ShippingAddressDTO shippingAddress;
 
     @NotEmpty(message = "Cart items must not be empty")
-    @Schema(description = "List of items in the cart")
+    @Schema(description = "Items to be ordered")
     private List<@Valid CartItemDTO> cartItems;
 
     public @NotNull(message = "User ID is required") Long getUserId() {

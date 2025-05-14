@@ -4,24 +4,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
-@Schema(
-        name = "ErrorResponse",
-        description = "Structured error details for failed requests",
-        example = """
-    {
-      "timestamp": "2024-05-04T11:35:00",
-      "status": 404,
-      "error": "Not Found",
-      "message": "Order not found",
-      "path": "/order/orders/999"
-    }
-    """
-)
+@Schema(description = "Structured error details")
 public class ErrorResponse {
+
+    @Schema(description = "Error timestamp", example = "2024-05-04T11:35:00")
     private LocalDateTime timestamp;
+
+    @Schema(description = "HTTP status code", example = "404")
     private int status;
+
+    @Schema(description = "Error short label", example = "Not Found")
     private String error;
+
+    @Schema(description = "Detailed error message", example = "Order not found")
     private String message;
+
+    @Schema(description = "Request path", example = "/order/orders/999")
     private String path;
 
     // Constructors

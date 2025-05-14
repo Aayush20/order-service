@@ -2,6 +2,7 @@ package org.example.orderservice.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -9,7 +10,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.Order;
-import org.example.orderservice.models.OrderStatus;
 import org.example.orderservice.services.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -32,13 +32,31 @@ public class OrderController {
     @Autowired
     private OrderService orderService;
 
-    @Operation(summary = "Get current user's cart",
+    @Operation(
+            summary = "Get current user's cart",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Cart fetched",
-                            content = @Content(schema = @Schema(implementation = CartDTO.class))),
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = CartDTO.class))
+                    ),
                     @ApiResponse(responseCode = "401", description = "Unauthorized",
-                            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-            })
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(
+                                            value = """
+                        {
+                          "timestamp": "2024-05-04T10:00:00",
+                          "status": 401,
+                          "error": "Unauthorized",
+                          "message": "JWT expired or invalid",
+                          "path": "/order/cart"
+                        }
+                        """
+                                    )
+                            )
+                    )
+            }
+    )
     @GetMapping("/cart")
     public ResponseEntity<CartDTO> showCart(Authentication authentication) {
         String userId = authentication.getName();
@@ -47,9 +65,10 @@ public class OrderController {
 
     @Operation(summary = "Add item to cart",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Item added",
+                    @ApiResponse(responseCode = "200", description = "Item added to cart",
                             content = @Content(schema = @Schema(implementation = CartDTO.class)))
-            })
+            }
+    )
     @PostMapping("/cart")
     public ResponseEntity<CartDTO> addToCart(Authentication authentication,
                                              @RequestBody @Valid CartItemRequestDTO cartItemRequest) {
@@ -61,7 +80,8 @@ public class OrderController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Item removed",
                             content = @Content(schema = @Schema(implementation = CartDTO.class)))
-            })
+            }
+    )
     @DeleteMapping("/cart/{itemId}")
     public ResponseEntity<CartDTO> removeFromCart(Authentication authentication,
                                                   @PathVariable Long itemId) {
@@ -73,9 +93,21 @@ public class OrderController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Order placed",
                             content = @Content(schema = @Schema(implementation = OrderResponseDTO.class))),
-                    @ApiResponse(responseCode = "400", description = "Cart is empty or invalid request",
-                            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-            })
+                    @ApiResponse(responseCode = "400", description = "Cart is empty or validation failed",
+                            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(value = """
+                    {
+                      "timestamp": "2024-05-04T11:35:00",
+                      "status": 400,
+                      "error": "Bad Request",
+                      "message": "Cart is empty",
+                      "path": "/order/placeorder"
+                    }
+                    """)
+                            )
+                    )
+            }
+    )
     @PostMapping("/placeorder")
     public ResponseEntity<OrderResponseDTO> placeOrder(Authentication authentication,
                                                        @RequestBody @Valid OrderRequestDTO orderRequest,
@@ -88,9 +120,10 @@ public class OrderController {
 
     @Operation(summary = "Get paginated orders for current user",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Paginated order list",
+                    @ApiResponse(responseCode = "200", description = "Paginated order list returned",
                             content = @Content(schema = @Schema(implementation = OrderResponseDTO.class)))
-            })
+            }
+    )
     @GetMapping("/orders")
     public ResponseEntity<Page<OrderResponseDTO>> getOrders(Authentication authentication,
                                                             @RequestParam(defaultValue = "0") int page,
@@ -102,13 +135,14 @@ public class OrderController {
         return ResponseEntity.ok(responsePage);
     }
 
-    @Operation(summary = "Get order by ID",
+    @Operation(summary = "Get specific order by ID",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Order details",
+                    @ApiResponse(responseCode = "200", description = "Order found",
                             content = @Content(schema = @Schema(implementation = OrderResponseDTO.class))),
                     @ApiResponse(responseCode = "404", description = "Order not found",
                             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-            })
+            }
+    )
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<OrderResponseDTO> getOrderById(@PathVariable Long orderId, Authentication authentication) {
         String userId = authentication.getName();
@@ -116,11 +150,12 @@ public class OrderController {
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
-    @Operation(summary = "Cancel an order by ID",
+    @Operation(summary = "Cancel an order",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Order cancelled",
                             content = @Content(schema = @Schema(implementation = OrderResponseDTO.class)))
-            })
+            }
+    )
     @PutMapping("/orders/{orderId}/cancel")
     public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, Authentication authentication) {
         String userId = authentication.getName();
@@ -128,13 +163,14 @@ public class OrderController {
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
-    @Operation(summary = "Update order status (Admin only)",
+    @Operation(summary = "Admin-only: Update order status",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Order status updated",
                             content = @Content(schema = @Schema(implementation = OrderResponseDTO.class))),
                     @ApiResponse(responseCode = "403", description = "Forbidden",
                             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-            })
+            }
+    )
     @PutMapping("/orders/{orderId}/status")
     public ResponseEntity<OrderResponseDTO> updateOrderStatus(@PathVariable Long orderId,
                                                               @RequestBody @Valid OrderStatusUpdateRequestDTO request,
@@ -150,11 +186,12 @@ public class OrderController {
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
-    @Operation(summary = "Get audit logs for an order (Admin only)",
+    @Operation(summary = "Admin-only: Get audit logs for an order",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Audit logs returned",
                             content = @Content(schema = @Schema(implementation = OrderAuditLogDTO.class)))
-            })
+            }
+    )
     @GetMapping("/orders/{orderId}/audit-log")
     public ResponseEntity<List<OrderAuditLogDTO>> getOrderAuditLog(@PathVariable Long orderId, Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()

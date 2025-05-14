@@ -1,22 +1,29 @@
 package org.example.orderservice.dtos;
 
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
 @Schema(description = "Snapshot of a product fetched from the product catalog")
 public class ProductDTO {
 
-    @Schema(example = "1005")
+    @Schema(description = "Product ID", example = "1005")
+    @NotNull
     private Long productId;
 
-    @Schema(example = "Samsung Galaxy S24")
+    @Schema(description = "Product name", example = "Samsung Galaxy S24")
+    @NotBlank
     private String name;
 
-    @Schema(example = "999.99")
+    @Schema(description = "Price of the product", example = "999.99")
+    @NotNull
     private BigDecimal price;
 
-    @Schema(example = "INR")
+    @Schema(description = "Currency code", example = "INR")
+    @NotNull
     private String currency;
 
     public ProductDTO() {
