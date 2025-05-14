@@ -26,6 +26,17 @@ public class OrderItemDTO {
         if (unitPrice == null) return null;
         return unitPrice.multiply(BigDecimal.valueOf(100)).longValue();
     }
+    public OrderItemDTO() {
+    }
+
+    public OrderItemDTO(Long productId, String productName, int quantity, BigDecimal unitPrice, String currency) {
+        this.productId = productId;
+        this.productName = productName;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.currency = currency;
+    }
+
 
     public Long getProductId() {
         return productId;

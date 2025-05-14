@@ -22,6 +22,17 @@ public class ShippingAddressDTO {
     @Schema(example = "NW1 6XE")
     private String zipCode;
 
+    public ShippingAddressDTO() {
+    }
+
+    public ShippingAddressDTO(String street, String city, String state, String zipCode) {
+        this.street = street;
+        this.city = city;
+        this.state = state;
+        this.zipCode = zipCode;
+    }
+
+
 
     public @NotBlank(message = "Street is required") String getStreet() {
         return street;

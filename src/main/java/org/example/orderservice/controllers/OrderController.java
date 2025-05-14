@@ -78,9 +78,11 @@ public class OrderController {
             })
     @PostMapping("/placeorder")
     public ResponseEntity<OrderResponseDTO> placeOrder(Authentication authentication,
-                                                       @RequestBody @Valid OrderRequestDTO orderRequest) {
+                                                       @RequestBody @Valid OrderRequestDTO orderRequest,
+                                                       @RequestHeader("Authorization") String authHeader) {
         String userId = authentication.getName();
-        Order order = orderService.placeOrder(userId, orderRequest);
+        String token = authHeader.replace("Bearer ", "");
+        Order order = orderService.placeOrder(userId, orderRequest, token);
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 

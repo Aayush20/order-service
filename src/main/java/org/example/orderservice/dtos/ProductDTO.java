@@ -19,6 +19,15 @@ public class ProductDTO {
     @Schema(example = "INR")
     private String currency;
 
+    public ProductDTO() {
+    }
+    public ProductDTO(Long productId, String name, BigDecimal price, String currency) {
+        this.productId = productId;
+        this.name = name;
+        this.price = price;
+        this.currency = currency;
+    }
+
 
     public Long getProductId() {
         return productId;

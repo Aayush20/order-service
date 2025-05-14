@@ -2,11 +2,10 @@ package org.example.orderservice.services;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.example.orderservice.configs.kafka.KafkaPublisher;
-import org.example.orderservice.dtos.CartItemRequestDTO;
-import org.example.orderservice.dtos.OrderAuditLogDTO;
-import org.example.orderservice.dtos.OrderRequestDTO;
+import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.CartRepository;
+import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
 import org.example.orderservice.repositories.OrderAuditLogRepository;
 import org.example.orderservice.repositories.OrderRepository;
 import org.slf4j.Logger;
@@ -30,6 +29,11 @@ public class OrderService {
     private final OrderAuditLogRepository auditLogRepository;
     private final MeterRegistry meterRegistry;
     private final EmailService emailService;
+    private final InventoryClient inventoryClient;
+    private final InventoryRollbackTaskRepository rollbackTaskRepository;
+    private final UserProfileClient userProfileClient;
+
+
 
 
     public OrderService(CartRepository cartRepository,
@@ -38,7 +42,10 @@ public class OrderService {
                         KafkaPublisher kafkaPublisher,
                         OrderAuditLogRepository auditLogRepository,
                         MeterRegistry meterRegistry,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        InventoryClient inventoryClient,
+                        InventoryRollbackTaskRepository rollbackTaskRepository,
+                        UserProfileClient userProfileClient) {
         this.cartRepository = cartRepository;
         this.orderRepository = orderRepository;
         this.productClient = productClient;
@@ -46,12 +53,21 @@ public class OrderService {
         this.auditLogRepository = auditLogRepository;
         this.meterRegistry = meterRegistry;
         this.emailService = emailService;
+        this.inventoryClient = inventoryClient;
+        this.rollbackTaskRepository = rollbackTaskRepository;
+        this.userProfileClient = userProfileClient;
     }
 
 
     @Transactional
     public Cart addToCart(String userId, CartItemRequestDTO cartItemRequest) {
         var product = productClient.getProductDetails(cartItemRequest.getProductId());
+
+        if ("UNAVAILABLE".equalsIgnoreCase(product.getName())) {
+            logger.warn("🚫 Product {} could not be fetched. Skipping cart add for user {}", cartItemRequest.getProductId(), userId);
+            throw new RuntimeException("Product is temporarily unavailable. Please try again later.");
+        }
+
         Cart cart = cartRepository.findByUserId(userId).orElse(new Cart(userId));
 
         CartItem cartItem = new CartItem(cartItemRequest.getProductId(), cartItemRequest.getQuantity());
@@ -78,7 +94,7 @@ public class OrderService {
     }
 
     @Transactional
-    public Order placeOrder(String userId, OrderRequestDTO orderRequest) {
+    public Order placeOrder(String userId, OrderRequestDTO orderRequest, String bearerToken) {
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Cart is empty"));
 
@@ -86,11 +102,14 @@ public class OrderService {
             throw new RuntimeException("Cart is empty");
         }
 
+        UserProfileDTO profile = userProfileClient.getUserProfile(bearerToken);
+        UserProfileDTO.AddressDTO addr = profile.getAddress();
+
         ShippingAddress address = new ShippingAddress(
-                orderRequest.getShippingAddress().getStreet(),
-                orderRequest.getShippingAddress().getCity(),
-                orderRequest.getShippingAddress().getState(),
-                orderRequest.getShippingAddress().getZipCode()
+                addr.getStreet(),
+                addr.getCity(),
+                addr.getState(),
+                addr.getZipCode()
         );
 
         Order order = new Order(userId, address);
@@ -109,16 +128,16 @@ public class OrderService {
         kafkaPublisher.publishOrderPlaced(saved);
         auditLogRepository.save(new OrderAuditLog(saved.getId(), userId, "PLACED"));
         meterRegistry.counter("orders.placed.total").increment();
-        //meterRegistry.counter("orders.placed.user", "userId", userId).increment();
+
         emailService.sendOrderConfirmationEmail(
-                userId + "@example.com", // or fetch from user profile
+                profile.getEmail(),
                 "Your Order #" + saved.getId() + " has been placed!",
                 "Thank you for your order. We'll ship it soon."
         );
 
         return saved;
-
     }
+
 
     public List<Order> getOrdersForUser(String userId) {
         return orderRepository.findByUserId(userId);
@@ -147,6 +166,19 @@ public class OrderService {
         kafkaPublisher.publishOrderCancelled(order);
         auditLogRepository.save(new OrderAuditLog(orderId, userId, "CANCELLED"));
         meterRegistry.counter("orders.cancelled.total").increment();
+
+        // ✅ Inventory rollback logic
+        List<Long> productIds = order.getOrderItems().stream()
+                .map(OrderItem::getProductId)
+                .toList();
+
+        RollbackRequestDTO rollbackRequest = new RollbackRequestDTO(productIds);
+        inventoryClient.rollbackStock(rollbackRequest);
+        InventoryRollbackTask task = new InventoryRollbackTask();
+        task.setOrderId(order.getId());
+        task.setProductIds(productIds);
+        rollbackTaskRepository.save(task);
+
 
         return orderRepository.save(order);
     }

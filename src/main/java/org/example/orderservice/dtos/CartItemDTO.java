@@ -29,6 +29,18 @@ public class CartItemDTO {
     @Schema(example = "USD")
     private String currency;
 
+
+    public CartItemDTO() {
+    }
+    public CartItemDTO(Long productId, String productName, int quantity, BigDecimal unitPrice, String currency) {
+        this.productId = productId;
+        this.productName = productName;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.currency = currency;
+    }
+
+
     public @NotNull(message = "Product ID is required") Long getProductId() {
         return productId;
     }

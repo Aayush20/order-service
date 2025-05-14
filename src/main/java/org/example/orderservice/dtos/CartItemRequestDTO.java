@@ -15,6 +15,15 @@ public class CartItemRequestDTO {
     @Schema(example = "3")
     private int quantity;
 
+    public CartItemRequestDTO() {
+    }
+
+    public CartItemRequestDTO(Long productId, int quantity) {
+        this.productId = productId;
+        this.quantity = quantity;
+    }
+
+
     public @NotNull(message = "Product ID is required") Long getProductId() {
         return productId;
     }

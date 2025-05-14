@@ -9,11 +9,16 @@ public class OrderAuditLogDTO {
     private String action;
     private Instant timestamp;
 
+    public OrderAuditLogDTO() {
+    }
+
     public OrderAuditLogDTO(String performedBy, String action, Instant timestamp) {
         this.performedBy = performedBy;
         this.action = action;
         this.timestamp = timestamp;
     }
+
+
 
     public static OrderAuditLogDTO fromEntity(OrderAuditLog log) {
         return new OrderAuditLogDTO(log.getPerformedBy(), log.getAction(), log.getCreatedAt());

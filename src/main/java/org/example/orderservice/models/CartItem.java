@@ -36,6 +36,15 @@ public class CartItem extends BaseEntity {
         this.quantity = quantity;
     }
 
+    public CartItem(Long productId, int quantity, String productName, BigDecimal unitPrice, String currency) {
+        this.productId = productId;
+        this.quantity = quantity;
+        this.productName = productName;
+        this.unitPrice = unitPrice;
+        this.currency = currency;
+    }
+
+
     public Long getProductId() {
         return productId;
     }
