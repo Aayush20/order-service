@@ -24,11 +24,13 @@ public class OrderServiceSecurityConfig {
                                 "/api-docs/**",
                                 "/actuator/**"
                         ).permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/orders/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/orders/place").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/orders/cancel/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/orders/status/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/order/orders/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/order/placeorder").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/order/cart/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/order/cart").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/order/orders/**/cancel").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/order/orders/**/status").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/order/orders/**/audit-log").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

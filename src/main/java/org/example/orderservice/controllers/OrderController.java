@@ -17,11 +17,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static org.example.orderservice.utils.JwtClaimUtils.hasRole;
 
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -174,15 +179,11 @@ public class OrderController {
     @PutMapping("/orders/{orderId}/status")
     public ResponseEntity<OrderResponseDTO> updateOrderStatus(@PathVariable Long orderId,
                                                               @RequestBody @Valid OrderStatusUpdateRequestDTO request,
-                                                              Authentication authentication) {
-        String userId = authentication.getName();
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals("ROLE_ADMIN"));
-        if (!isAdmin) {
+                                                              @AuthenticationPrincipal Jwt jwt) {
+        if (!hasRole(jwt, "ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        Order order = orderService.updateOrderStatus(orderId, request.getNewStatus(), userId);
+        Order order = orderService.updateOrderStatus(orderId, request.getNewStatus(), jwt.getSubject());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -193,13 +194,19 @@ public class OrderController {
             }
     )
     @GetMapping("/orders/{orderId}/audit-log")
-    public ResponseEntity<List<OrderAuditLogDTO>> getOrderAuditLog(@PathVariable Long orderId, Authentication authentication) {
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals("ROLE_ADMIN"));
-        if (!isAdmin) {
+    public ResponseEntity<List<OrderAuditLogDTO>> getOrderAuditLog(@PathVariable Long orderId,
+                                                                   @AuthenticationPrincipal Jwt jwt) {
+        if (!hasRole(jwt, "ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(orderService.getAuditLogsForOrder(orderId));
+    }
+
+    @Operation(summary = "Get current JWT claims (debug only)",
+            description = "Returns the authenticated user's JWT claims")
+    @GetMapping("/me")
+    @PreAuthorize("@jwtClaimUtils.hasRole(#jwt, 'ADMIN') or @jwtClaimUtils.hasScope(#jwt, 'internal')")
+    public ResponseEntity<?> getCurrentJwtInfo(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(jwt.getClaims());
     }
 }
