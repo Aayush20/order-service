@@ -1,6 +1,8 @@
 package org.example.orderservice.services;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.example.orderservice.clients.ProductClient;
+import org.example.orderservice.clients.UserProfileClient;
 import org.example.orderservice.configs.kafka.KafkaPublisher;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.*;

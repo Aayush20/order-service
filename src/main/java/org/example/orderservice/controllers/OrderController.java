@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.Order;
 import org.example.orderservice.services.OrderService;
+import org.example.orderservice.services.TokenService;
+import org.example.orderservice.utils.TokenClaimUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +38,9 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private TokenService tokenService;
 
     @Operation(
             summary = "Get current user's cart",
@@ -63,9 +68,9 @@ public class OrderController {
             }
     )
     @GetMapping("/cart")
-    public ResponseEntity<CartDTO> showCart(Authentication authentication) {
-        String userId = authentication.getName();
-        return ResponseEntity.ok(CartDTO.fromEntity(orderService.getCart(userId)));
+    public ResponseEntity<CartDTO> showCart(@RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        return ResponseEntity.ok(CartDTO.fromEntity(orderService.getCart(token.getSub())));
     }
 
     @Operation(summary = "Add item to cart",
@@ -75,10 +80,10 @@ public class OrderController {
             }
     )
     @PostMapping("/cart")
-    public ResponseEntity<CartDTO> addToCart(Authentication authentication,
+    public ResponseEntity<CartDTO> addToCart(@RequestHeader("Authorization") String tokenHeader,
                                              @RequestBody @Valid CartItemRequestDTO cartItemRequest) {
-        String userId = authentication.getName();
-        return ResponseEntity.ok(CartDTO.fromEntity(orderService.addToCart(userId, cartItemRequest)));
+        var token = tokenService.introspect(tokenHeader);
+        return ResponseEntity.ok(CartDTO.fromEntity(orderService.addToCart(token.getSub(), cartItemRequest)));
     }
 
     @Operation(summary = "Remove item from cart",
@@ -88,10 +93,10 @@ public class OrderController {
             }
     )
     @DeleteMapping("/cart/{itemId}")
-    public ResponseEntity<CartDTO> removeFromCart(Authentication authentication,
+    public ResponseEntity<CartDTO> removeFromCart(@RequestHeader("Authorization") String tokenHeader,
                                                   @PathVariable Long itemId) {
-        String userId = authentication.getName();
-        return ResponseEntity.ok(CartDTO.fromEntity(orderService.removeItemFromCart(userId, itemId)));
+        var token = tokenService.introspect(tokenHeader);
+        return ResponseEntity.ok(CartDTO.fromEntity(orderService.removeItemFromCart(token.getSub(), itemId)));
     }
 
     @Operation(summary = "Place an order",
@@ -116,10 +121,10 @@ public class OrderController {
     @PostMapping("/placeorder")
     public ResponseEntity<OrderResponseDTO> placeOrder(Authentication authentication,
                                                        @RequestBody @Valid OrderRequestDTO orderRequest,
-                                                       @RequestHeader("Authorization") String authHeader) {
-        String userId = authentication.getName();
-        String token = authHeader.replace("Bearer ", "");
-        Order order = orderService.placeOrder(userId, orderRequest, token);
+                                                       @RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        String strippedToken = tokenHeader.replace("Bearer ", "");
+        Order order = orderService.placeOrder(token.getSub(), orderRequest, strippedToken);
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -130,12 +135,12 @@ public class OrderController {
             }
     )
     @GetMapping("/orders")
-    public ResponseEntity<Page<OrderResponseDTO>> getOrders(Authentication authentication,
+    public ResponseEntity<Page<OrderResponseDTO>> getOrders(@RequestHeader("Authorization") String tokenHeader,
                                                             @RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "10") int size) {
-        String userId = authentication.getName();
+        var token = tokenService.introspect(tokenHeader);
         Pageable pageable = PageRequest.of(page, size);
-        Page<OrderResponseDTO> responsePage = orderService.getOrdersForUser(userId, pageable)
+        Page<OrderResponseDTO> responsePage = orderService.getOrdersForUser(token.getSub(), pageable)
                 .map(OrderResponseDTO::fromOrder);
         return ResponseEntity.ok(responsePage);
     }
@@ -149,9 +154,9 @@ public class OrderController {
             }
     )
     @GetMapping("/orders/{orderId}")
-    public ResponseEntity<OrderResponseDTO> getOrderById(@PathVariable Long orderId, Authentication authentication) {
-        String userId = authentication.getName();
-        Order order = orderService.getOrderByIdAndUserId(orderId, userId);
+    public ResponseEntity<OrderResponseDTO> getOrderById(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        Order order = orderService.getOrderByIdAndUserId(orderId, token.getSub());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -162,9 +167,9 @@ public class OrderController {
             }
     )
     @PutMapping("/orders/{orderId}/cancel")
-    public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, Authentication authentication) {
-        String userId = authentication.getName();
-        Order order = orderService.cancelOrder(orderId, userId);
+    public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        Order order = orderService.cancelOrder(orderId, token.getSub());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -179,11 +184,12 @@ public class OrderController {
     @PutMapping("/orders/{orderId}/status")
     public ResponseEntity<OrderResponseDTO> updateOrderStatus(@PathVariable Long orderId,
                                                               @RequestBody @Valid OrderStatusUpdateRequestDTO request,
-                                                              @AuthenticationPrincipal Jwt jwt) {
-        if (!hasRole(jwt, "ADMIN")) {
+                                                              @RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        if (!TokenClaimUtils.hasRole(token, "ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        Order order = orderService.updateOrderStatus(orderId, request.getNewStatus(), jwt.getSubject());
+        Order order = orderService.updateOrderStatus(orderId, request.getNewStatus(), token.getSub());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -195,8 +201,9 @@ public class OrderController {
     )
     @GetMapping("/orders/{orderId}/audit-log")
     public ResponseEntity<List<OrderAuditLogDTO>> getOrderAuditLog(@PathVariable Long orderId,
-                                                                   @AuthenticationPrincipal Jwt jwt) {
-        if (!hasRole(jwt, "ADMIN")) {
+                                                                   @RequestHeader("Authorization") String tokenHeader) {
+        var token = tokenService.introspect(tokenHeader);
+        if (!TokenClaimUtils.hasRole(token, "ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(orderService.getAuditLogsForOrder(orderId));
@@ -205,8 +212,7 @@ public class OrderController {
     @Operation(summary = "Get current JWT claims (debug only)",
             description = "Returns the authenticated user's JWT claims")
     @GetMapping("/me")
-    @PreAuthorize("@jwtClaimUtils.hasRole(#jwt, 'ADMIN') or @jwtClaimUtils.hasScope(#jwt, 'internal')")
-    public ResponseEntity<?> getCurrentJwtInfo(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(jwt.getClaims());
+    public ResponseEntity<?> getCurrentTokenInfo(@RequestHeader("Authorization") String tokenHeader) {
+        return ResponseEntity.ok(tokenService.introspect(tokenHeader));
     }
 }
