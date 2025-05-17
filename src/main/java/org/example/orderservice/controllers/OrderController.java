@@ -26,9 +26,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 
-import static org.example.orderservice.utils.JwtClaimUtils.hasRole;
 
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -121,7 +121,7 @@ public class OrderController {
     @PostMapping("/placeorder")
     public ResponseEntity<OrderResponseDTO> placeOrder(Authentication authentication,
                                                        @RequestBody @Valid OrderRequestDTO orderRequest,
-                                                       @RequestHeader("Authorization") String tokenHeader) {
+                                                       @RequestHeader("Authorization") String tokenHeader) throws IOException {
         var token = tokenService.introspect(tokenHeader);
         String strippedToken = tokenHeader.replace("Bearer ", "");
         Order order = orderService.placeOrder(token.getSub(), orderRequest, strippedToken);
@@ -170,6 +170,7 @@ public class OrderController {
     public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) {
         var token = tokenService.introspect(tokenHeader);
         Order order = orderService.cancelOrder(orderId, token.getSub());
+
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 

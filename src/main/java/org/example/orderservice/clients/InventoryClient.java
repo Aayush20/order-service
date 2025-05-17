@@ -1,4 +1,4 @@
-package org.example.orderservice.services;
+package org.example.orderservice.clients;
 
 import org.example.orderservice.dtos.RollbackRequestDTO;
 import org.slf4j.Logger;

@@ -4,7 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.example.orderservice.dtos.RollbackRequestDTO;
 import org.example.orderservice.models.InventoryRollbackTask;
 import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
-import org.example.orderservice.services.InventoryClient;
+import org.example.orderservice.clients.InventoryClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -1,6 +1,7 @@
 package org.example.orderservice.services;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.example.orderservice.clients.InventoryClient;
 import org.example.orderservice.clients.ProductClient;
 import org.example.orderservice.clients.UserProfileClient;
 import org.example.orderservice.configs.kafka.KafkaPublisher;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -28,7 +30,7 @@ public class OrderServiceTest {
     @Mock private ProductClient productClient;
     @Mock private KafkaPublisher kafkaPublisher;
     @Mock private OrderAuditLogRepository auditLogRepository;
-    @Mock private EmailService emailService;
+    @Mock private SendGridEmailService emailService;
     @Mock private InventoryClient inventoryClient;
     @Mock private InventoryRollbackTaskRepository rollbackTaskRepository;
     @Mock private UserProfileClient userProfileClient;
@@ -82,7 +84,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    void shouldPlaceOrderSuccessfullyWithUserProfile() {
+    void shouldPlaceOrderSuccessfullyWithUserProfile() throws IOException {
         String userId = "user123";
         String token = "mock-token";
 
@@ -110,7 +112,7 @@ public class OrderServiceTest {
         assertEquals(1, result.getOrderItems().size());
         verify(kafkaPublisher).publishOrderPlaced(any());
         verify(auditLogRepository).save(any());
-        verify(emailService).sendOrderConfirmationEmail(eq("user123@example.com"), any(), any());
+        verify(emailService).sendEmail(eq("user123@example.com"), any(), any());
     }
 
     @Test

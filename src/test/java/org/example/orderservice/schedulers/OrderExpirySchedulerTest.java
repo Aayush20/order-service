@@ -5,7 +5,7 @@ import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
 import org.example.orderservice.repositories.OrderAuditLogRepository;
 import org.example.orderservice.repositories.OrderRepository;
-import org.example.orderservice.services.InventoryClient;
+import org.example.orderservice.clients.InventoryClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

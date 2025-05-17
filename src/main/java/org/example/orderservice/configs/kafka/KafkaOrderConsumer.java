@@ -5,7 +5,7 @@ import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
 import org.example.orderservice.repositories.OrderAuditLogRepository;
 import org.example.orderservice.repositories.OrderRepository;
-import org.example.orderservice.services.InventoryClient;
+import org.example.orderservice.clients.InventoryClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;

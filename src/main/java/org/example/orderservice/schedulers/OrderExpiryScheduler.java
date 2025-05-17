@@ -7,7 +7,7 @@ import org.example.orderservice.models.OrderItem;
 import org.example.orderservice.models.OrderStatus;
 import org.example.orderservice.repositories.OrderAuditLogRepository;
 import org.example.orderservice.repositories.OrderRepository;
-import org.example.orderservice.services.InventoryClient;
+import org.example.orderservice.clients.InventoryClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

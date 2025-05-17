@@ -1,6 +1,7 @@
 package org.example.orderservice.services;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.example.orderservice.clients.InventoryClient;
 import org.example.orderservice.clients.ProductClient;
 import org.example.orderservice.clients.UserProfileClient;
 import org.example.orderservice.configs.kafka.KafkaPublisher;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -30,10 +32,11 @@ public class OrderService {
     private final KafkaPublisher kafkaPublisher;
     private final OrderAuditLogRepository auditLogRepository;
     private final MeterRegistry meterRegistry;
-    private final EmailService emailService;
+    private final SendGridEmailService emailService;
     private final InventoryClient inventoryClient;
     private final InventoryRollbackTaskRepository rollbackTaskRepository;
     private final UserProfileClient userProfileClient;
+
 
 
 
@@ -44,10 +47,11 @@ public class OrderService {
                         KafkaPublisher kafkaPublisher,
                         OrderAuditLogRepository auditLogRepository,
                         MeterRegistry meterRegistry,
-                        EmailService emailService,
+                        SendGridEmailService emailService,
                         InventoryClient inventoryClient,
                         InventoryRollbackTaskRepository rollbackTaskRepository,
-                        UserProfileClient userProfileClient) {
+                        UserProfileClient userProfileClient
+                        ) {
         this.cartRepository = cartRepository;
         this.orderRepository = orderRepository;
         this.productClient = productClient;
@@ -96,7 +100,7 @@ public class OrderService {
     }
 
     @Transactional
-    public Order placeOrder(String userId, OrderRequestDTO orderRequest, String bearerToken) {
+    public Order placeOrder(String userId, OrderRequestDTO orderRequest, String bearerToken) throws IOException {
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Cart is empty"));
 
@@ -131,11 +135,35 @@ public class OrderService {
         auditLogRepository.save(new OrderAuditLog(saved.getId(), userId, "PLACED"));
         meterRegistry.counter("orders.placed.total").increment();
 
-        emailService.sendOrderConfirmationEmail(
-                profile.getEmail(),
-                "Your Order #" + saved.getId() + " has been placed!",
-                "Thank you for your order. We'll ship it soon."
-        );
+        try {
+            emailService.sendEmail(
+                    profile.getEmail(), // Already retrieved from userProfileClient
+                    "🎉 Your Order #" + saved.getId() + " is Confirmed!",
+                    """
+                    Thank you for shopping with us!
+            
+                    📦 Order ID: %s
+                    👤 Name: %s
+                    🏠 Shipping To: %s, %s, %s, %s
+                    💰 Total Items: %d
+            
+                    We'll notify you once your order is shipped. Visit your dashboard to track the order.
+            
+                    -- YourShop Team
+                    """.formatted(
+                            saved.getId(),
+                            profile.getName(),
+                            addr.getStreet(),
+                            addr.getCity(),
+                            addr.getState(),
+                            addr.getZipCode(),
+                            saved.getOrderItems().size()
+                    )
+            );
+        } catch (IOException e) {
+            logger.warn("❌ Failed to send order confirmation email for order {}: {}", saved.getId(), e.getMessage());
+        }
+
 
         return saved;
     }
@@ -168,6 +196,18 @@ public class OrderService {
         kafkaPublisher.publishOrderCancelled(order);
         auditLogRepository.save(new OrderAuditLog(orderId, userId, "CANCELLED"));
         meterRegistry.counter("orders.cancelled.total").increment();
+        try {
+            UserProfileDTO profile = userProfileClient.getUserProfile("Bearer " + userId);
+            emailService.sendEmail(
+                    profile.getEmail(),
+                    "❌ Order #" + orderId + " Cancelled",
+                    "Your order has been cancelled successfully. If this wasn't you, please contact support immediately."
+            );
+
+        } catch (IOException e) {
+            logger.warn("❌ Failed to send order cancellation email for order {}: {}", orderId, e.getMessage());
+        }
+
 
         // ✅ Inventory rollback logic
         List<Long> productIds = order.getOrderItems().stream()
