@@ -1,5 +1,6 @@
 package org.example.orderservice.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -167,7 +168,7 @@ public class OrderController {
             }
     )
     @PutMapping("/orders/{orderId}/cancel")
-    public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) {
+    public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) throws JsonProcessingException {
         var token = tokenService.introspect(tokenHeader);
         Order order = orderService.cancelOrder(orderId, token.getSub());
 

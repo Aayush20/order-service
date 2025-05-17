@@ -1,10 +1,12 @@
 package org.example.orderservice.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.example.orderservice.clients.InventoryClient;
 import org.example.orderservice.clients.ProductClient;
 import org.example.orderservice.clients.UserProfileClient;
-import org.example.orderservice.configs.kafka.KafkaPublisher;
+import org.example.orderservice.kafka.KafkaPublisher;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.CartRepository;
@@ -13,12 +15,15 @@ import org.example.orderservice.repositories.OrderAuditLogRepository;
 import org.example.orderservice.repositories.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -64,7 +69,7 @@ public class OrderService {
         this.userProfileClient = userProfileClient;
     }
 
-
+    @CacheEvict(value = "userCart", key = "#userId")
     @Transactional
     public Cart addToCart(String userId, CartItemRequestDTO cartItemRequest) {
         var product = productClient.getProductDetails(cartItemRequest.getProductId());
@@ -86,10 +91,12 @@ public class OrderService {
         return cartRepository.save(cart);
     }
 
+    @Cacheable(value = "userCart", key = "#userId")
     public Cart getCart(String userId) {
         return cartRepository.findByUserId(userId).orElse(new Cart(userId));
     }
 
+    @CacheEvict(value = "userCart", key = "#userId")
     @Transactional
     public Cart removeItemFromCart(String userId, Long itemId) {
         Cart cart = cartRepository.findByUserId(userId)
@@ -99,6 +106,7 @@ public class OrderService {
         return cartRepository.save(cart);
     }
 
+    @CacheEvict(value = "userCart", key = "#userId")
     @Transactional
     public Order placeOrder(String userId, OrderRequestDTO orderRequest, String bearerToken) throws IOException {
         Cart cart = cartRepository.findByUserId(userId)
@@ -173,6 +181,7 @@ public class OrderService {
         return orderRepository.findByUserId(userId);
     }
 
+    @Cacheable(value = "orderDetails", key = "#orderId + '-' + #userId")
     public Order getOrderByIdAndUserId(Long orderId, String userId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
@@ -182,8 +191,9 @@ public class OrderService {
         return order;
     }
 
+    @CacheEvict(value = { "orders", "orderDetails", "orderAuditLogs" }, allEntries = true)
     @Transactional
-    public Order cancelOrder(Long orderId, String userId) {
+    public Order cancelOrder(Long orderId, String userId) throws JsonProcessingException {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         if (!order.getUserId().equals(userId)) {
@@ -210,25 +220,37 @@ public class OrderService {
 
 
         // ✅ Inventory rollback logic
-        List<Long> productIds = order.getOrderItems().stream()
-                .map(OrderItem::getProductId)
+        List<RollbackStockRequestDto.ProductRollbackEntry> entries = order.getOrderItems().stream()
+                .map(item -> new RollbackStockRequestDto.ProductRollbackEntry(item.getProductId(), item.getQuantity()))
                 .toList();
 
-        RollbackRequestDTO rollbackRequest = new RollbackRequestDTO(productIds);
-        inventoryClient.rollbackStock(rollbackRequest);
-        InventoryRollbackTask task = new InventoryRollbackTask();
-        task.setOrderId(order.getId());
-        task.setProductIds(productIds);
-        rollbackTaskRepository.save(task);
+        RollbackStockRequestDto rollbackRequest = new RollbackStockRequestDto(entries, "Cancelled by user");
+
+        try {
+            inventoryClient.rollbackStock(rollbackRequest);
+            logger.info("🔁 Rollback API called after user cancellation.");
+        } catch (Exception ex) {
+            logger.warn("❗ Failed to rollback stock. Queuing for retry: {}", ex.getMessage());
+
+            InventoryRollbackTask task = new InventoryRollbackTask();
+            task.setOrderId(order.getId());
+            task.setPayload(new ObjectMapper().writeValueAsString(rollbackRequest));
+            task.setRetryCount(0);
+            task.setLastTriedAt(Instant.now());
+            rollbackTaskRepository.save(task);
+        }
+
 
 
         return orderRepository.save(order);
     }
 
+    @Cacheable(value = "orders", key = "#userId + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
     public Page<Order> getOrdersForUser(String userId, Pageable pageable) {
         return orderRepository.findByUserId(userId, pageable);
     }
 
+    @CacheEvict(value = { "orders", "orderDetails", "orderAuditLogs" }, allEntries = true)
     @Transactional
     public Order updateOrderStatus(Long orderId, OrderStatus newStatus, String adminUsername) {
         Order order = orderRepository.findById(orderId)
@@ -256,6 +278,7 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    @Cacheable(value = "orderAuditLogs", key = "#orderId")
     public List<OrderAuditLogDTO> getAuditLogsForOrder(Long orderId) {
         List<OrderAuditLog> logs = auditLogRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
 

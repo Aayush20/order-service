@@ -1,10 +1,11 @@
 package org.example.orderservice.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.example.orderservice.clients.InventoryClient;
 import org.example.orderservice.clients.ProductClient;
 import org.example.orderservice.clients.UserProfileClient;
-import org.example.orderservice.configs.kafka.KafkaPublisher;
+import org.example.orderservice.kafka.KafkaPublisher;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.CartRepository;
@@ -132,7 +133,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    void shouldCancelOrder() {
+    void shouldCancelOrder() throws JsonProcessingException {
         String userId = "user123";
         Long orderId = 42L;
 

@@ -1,4 +1,4 @@
-package org.example.orderservice.configs.kafka;
+package org.example.orderservice.kafka;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

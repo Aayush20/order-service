@@ -1,6 +1,6 @@
 package org.example.orderservice.schedulers;
 
-import org.example.orderservice.dtos.RollbackRequestDTO;
+import org.example.orderservice.dtos.RollbackStockRequestDto;
 import org.example.orderservice.models.Order;
 import org.example.orderservice.models.OrderAuditLog;
 import org.example.orderservice.models.OrderItem;
@@ -56,11 +56,13 @@ public class OrderExpiryScheduler {
             orderRepository.save(order);
 
             // Trigger rollback
-            List<Long> productIds = order.getOrderItems().stream()
-                    .map(OrderItem::getProductId)
+            List<RollbackStockRequestDto.ProductRollbackEntry> entries = order.getOrderItems().stream()
+                    .map(item -> new RollbackStockRequestDto.ProductRollbackEntry(item.getProductId(), item.getQuantity()))
                     .toList();
 
-            inventoryClient.rollbackStock(new RollbackRequestDTO(productIds));
+            RollbackStockRequestDto rollbackDto = new RollbackStockRequestDto(entries, "Auto-expired");
+            inventoryClient.rollbackStock(rollbackDto);
+
 
             auditLogRepository.save(new OrderAuditLog(order.getId(), "system", "EXPIRED_AUTO_CANCELLED"));
             meterRegistry.counter("orders.expired.total").increment();

@@ -3,10 +3,16 @@ package org.example.orderservice.clients;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.example.orderservice.dtos.ProductDTO;
+
+import org.example.orderservice.dtos.RollbackStockRequestDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -45,4 +51,6 @@ public class ProductClient {
 
         return fallbackProduct;
     }
+
+
 }

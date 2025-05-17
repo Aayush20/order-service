@@ -1,6 +1,5 @@
-package org.example.orderservice.configs.kafka;
+package org.example.orderservice.kafka;
 
-import org.example.orderservice.dtos.RollbackRequestDTO;
 import org.example.orderservice.models.*;
 import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
 import org.example.orderservice.repositories.OrderAuditLogRepository;
@@ -53,41 +52,4 @@ public class KafkaOrderConsumer {
             logger.error("Error processing payment success event: {}", ex.getMessage());
         }
     }
-
-    @KafkaListener(topics = "payment_failed", groupId = "order-service")
-    @Transactional
-    public void handlePaymentFailedEvent(String orderIdStr) {
-        Order order = null;
-        List<Long> productIds = null;
-        try {
-            Long orderId = Long.parseLong(orderIdStr);
-            order = orderRepository.findById(orderId)
-                    .orElseThrow(() -> new RuntimeException("Order not found for ID: " + orderId));
-
-            if (order.getStatus() == OrderStatus.PLACED) {
-                order.setStatus(OrderStatus.CANCELLED);
-                orderRepository.save(order);
-
-                productIds = order.getOrderItems().stream()
-                        .map(OrderItem::getProductId)
-                        .toList();
-
-                inventoryClient.rollbackStock(new RollbackRequestDTO(productIds));
-                auditLogRepository.save(new OrderAuditLog(orderId, "system", "CANCELLED_DUE_TO_PAYMENT_FAILED"));
-                logger.info("❌ Order {} cancelled due to payment failure. Inventory rollback triggered.", orderId);
-            } else {
-                logger.info("Skipping payment failure rollback. Order {} is not in PLACED state.", orderId);
-            }
-        } catch (Exception ex) {
-            if (order != null && productIds != null) {
-                InventoryRollbackTask task = new InventoryRollbackTask();
-                task.setOrderId(order.getId());
-                task.setProductIds(productIds);
-                rollbackTaskRepository.save(task);
-            }
-            logger.error("❗ Error processing payment failed event: {}", ex.getMessage(), ex);
-        }
-    }
-
-
 }

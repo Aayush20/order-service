@@ -1,4 +1,4 @@
-package org.example.orderservice.configs.kafka;
+package org.example.orderservice.kafka;
 
 
 import org.example.orderservice.models.Order;

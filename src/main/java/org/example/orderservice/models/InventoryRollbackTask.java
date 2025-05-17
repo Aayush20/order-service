@@ -11,10 +11,9 @@ public class InventoryRollbackTask extends BaseEntity {
     @Column(nullable = false)
     private Long orderId;
 
-    @ElementCollection
-    @CollectionTable(name = "rollback_product_ids", joinColumns = @JoinColumn(name = "task_id"))
-    @Column(name = "product_id", nullable = false)
-    private List<Long> productIds;
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String payload; // JSON payload of RollbackStockRequestDto
 
     private int retryCount = 0;
 
@@ -22,7 +21,7 @@ public class InventoryRollbackTask extends BaseEntity {
 
     private Instant lastTriedAt;
 
-    // Getters and Setters
+    // Getters and setters
     public Long getOrderId() {
         return orderId;
     }
@@ -31,12 +30,12 @@ public class InventoryRollbackTask extends BaseEntity {
         this.orderId = orderId;
     }
 
-    public List<Long> getProductIds() {
-        return productIds;
+    public String getPayload() {
+        return payload;
     }
 
-    public void setProductIds(List<Long> productIds) {
-        this.productIds = productIds;
+    public void setPayload(String payload) {
+        this.payload = payload;
     }
 
     public int getRetryCount() {
@@ -63,3 +62,4 @@ public class InventoryRollbackTask extends BaseEntity {
         this.lastTriedAt = lastTriedAt;
     }
 }
+
