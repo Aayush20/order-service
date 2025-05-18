@@ -11,9 +11,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.orderservice.dtos.*;
 import org.example.orderservice.models.Order;
+import org.example.orderservice.security.AdminOnly;
 import org.example.orderservice.services.OrderService;
 import org.example.orderservice.services.TokenService;
 import org.example.orderservice.utils.TokenClaimUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +39,8 @@ import java.util.List;
 @RequestMapping("/order")
 @Tag(name = "Order APIs", description = "Operations related to cart and order processing")
 public class OrderController {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderController.class);
 
     @Autowired
     private OrderService orderService;
@@ -71,6 +76,7 @@ public class OrderController {
     @GetMapping("/cart")
     public ResponseEntity<CartDTO> showCart(@RequestHeader("Authorization") String tokenHeader) {
         var token = tokenService.introspect(tokenHeader);
+        log.info("Fetching cart for user {}", token.getSub());
         return ResponseEntity.ok(CartDTO.fromEntity(orderService.getCart(token.getSub())));
     }
 
@@ -84,6 +90,7 @@ public class OrderController {
     public ResponseEntity<CartDTO> addToCart(@RequestHeader("Authorization") String tokenHeader,
                                              @RequestBody @Valid CartItemRequestDTO cartItemRequest) {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} adding item to cart", token.getSub());
         return ResponseEntity.ok(CartDTO.fromEntity(orderService.addToCart(token.getSub(), cartItemRequest)));
     }
 
@@ -97,6 +104,7 @@ public class OrderController {
     public ResponseEntity<CartDTO> removeFromCart(@RequestHeader("Authorization") String tokenHeader,
                                                   @PathVariable Long itemId) {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} removing item {} from cart", token.getSub(), itemId);
         return ResponseEntity.ok(CartDTO.fromEntity(orderService.removeItemFromCart(token.getSub(), itemId)));
     }
 
@@ -124,6 +132,7 @@ public class OrderController {
                                                        @RequestBody @Valid OrderRequestDTO orderRequest,
                                                        @RequestHeader("Authorization") String tokenHeader) throws IOException {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} placing an order", token.getSub());
         String strippedToken = tokenHeader.replace("Bearer ", "");
         Order order = orderService.placeOrder(token.getSub(), orderRequest, strippedToken);
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
@@ -140,6 +149,7 @@ public class OrderController {
                                                             @RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "10") int size) {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} requesting orders", token.getSub());
         Pageable pageable = PageRequest.of(page, size);
         Page<OrderResponseDTO> responsePage = orderService.getOrdersForUser(token.getSub(), pageable)
                 .map(OrderResponseDTO::fromOrder);
@@ -157,6 +167,7 @@ public class OrderController {
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<OrderResponseDTO> getOrderById(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} fetching order {}", token.getSub(), orderId);
         Order order = orderService.getOrderByIdAndUserId(orderId, token.getSub());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
@@ -170,8 +181,8 @@ public class OrderController {
     @PutMapping("/orders/{orderId}/cancel")
     public ResponseEntity<OrderResponseDTO> cancelOrder(@PathVariable Long orderId, @RequestHeader("Authorization") String tokenHeader) throws JsonProcessingException {
         var token = tokenService.introspect(tokenHeader);
+        log.info("User {} cancelling order {}", token.getSub(), orderId);
         Order order = orderService.cancelOrder(orderId, token.getSub());
-
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
 
@@ -184,13 +195,15 @@ public class OrderController {
             }
     )
     @PutMapping("/orders/{orderId}/status")
+    @AdminOnly
     public ResponseEntity<OrderResponseDTO> updateOrderStatus(@PathVariable Long orderId,
                                                               @RequestBody @Valid OrderStatusUpdateRequestDTO request,
                                                               @RequestHeader("Authorization") String tokenHeader) {
         var token = tokenService.introspect(tokenHeader);
-        if (!TokenClaimUtils.hasRole(token, "ADMIN")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+//        if (!TokenClaimUtils.hasRole(token, "ADMIN")) {
+//            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+//        }
+        log.info("Admin {} updating order {} to {}", token.getSub(), orderId, request.getNewStatus());
         Order order = orderService.updateOrderStatus(orderId, request.getNewStatus(), token.getSub());
         return ResponseEntity.ok(OrderResponseDTO.fromOrder(order));
     }
@@ -202,12 +215,11 @@ public class OrderController {
             }
     )
     @GetMapping("/orders/{orderId}/audit-log")
+    @AdminOnly
     public ResponseEntity<List<OrderAuditLogDTO>> getOrderAuditLog(@PathVariable Long orderId,
                                                                    @RequestHeader("Authorization") String tokenHeader) {
         var token = tokenService.introspect(tokenHeader);
-        if (!TokenClaimUtils.hasRole(token, "ADMIN")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        log.info("Admin {} fetching audit log for order {}", token.getSub(), orderId);
         return ResponseEntity.ok(orderService.getAuditLogsForOrder(orderId));
     }
 

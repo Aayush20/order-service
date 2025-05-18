@@ -11,17 +11,20 @@ The **Order Service** is a Spring Boot microservice that handles shopping cart m
 - ✅ Place order from cart with shipping details
 - ✅ Cancel placed order (before payment)
 - ✅ Kafka Integration for:
-    - 📦 `order_placed` event
-    - ❌ `order_cancelled` event
-    - ❗ `payment_failed` rollback
+  - 📦 `order_placed` event
+  - ❌ `order_cancelled` event
+  - ❗ `payment_failed` rollback
 - ✅ Inventory rollback via `prod-cat-service` for failed/cancelled orders
 - ✅ Retry mechanism for failed rollback via DB queue
 - ✅ Auto-expiry of unpaid orders after configurable TTL (default: 30 mins)
-- ✅ MDC Logging with `requestId` and `userId`
+- ✅ MDC Logging with `requestId`, `orderId`, and `userId`
 - ✅ Swagger OpenAPI documentation
 - ✅ Resilience4j Retry + Circuit Breaker when calling Product Service
 - ✅ Prometheus metrics via Spring Actuator
-- ✅ Role-based admin control for status updates and audit logs
+- ✅ Role and scope-based admin control for status updates and audit logs
+- ✅ Token introspection with Redis caching
+- ✅ SendGrid email notifications
+- ✅ Dockerfile + GitHub CI Workflow
 
 ---
 
@@ -29,14 +32,15 @@ The **Order Service** is a Spring Boot microservice that handles shopping cart m
 
 - Java 17
 - Spring Boot 3.x
-- Spring Security (OAuth2 JWT)
+- Spring Security (OAuth2 JWT + RBAC)
 - Spring Data JPA (MySQL)
 - Spring Kafka (Producer + Consumer)
 - Spring Retry & Resilience4j
 - Micrometer + Prometheus + Actuator
 - Logback + SLF4J + MDC
 - Swagger (springdoc-openapi)
-- Eureka Client (for service discovery)
+- Eureka Client (Service Discovery)
+- Redis
 - Docker-ready
 
 ---
@@ -54,35 +58,27 @@ The **Order Service** is a Spring Boot microservice that handles shopping cart m
 | PUT    | `/order/orders/{id}/cancel` | Cancel order |
 | PUT    | `/order/orders/{id}/status` | Admin: Update status |
 | GET    | `/order/orders/{id}/audit-log` | Admin: View audit logs |
+| GET    | `/me/orders` | Get all orders for logged-in user |
 
-All endpoints are secured with OAuth2 (JWT bearer). Admin-only endpoints require `ROLE_ADMIN` authority.
-
----
-
-## 🗃️ Database Tables
-
-- `orders`
-- `order_item`
-- `cart`
-- `cart_item`
-- `order_audit_log`
-- `inventory_rollback_queue`
+All endpoints are secured with OAuth2 JWT tokens.
 
 ---
 
-## 🚚 Kafka Topics
+## 📬 Kafka Topics
 
-- `order_placed` – emitted on order placement
-- `order_cancelled` – emitted on cancellation
-- `payment_failed` – consumed to cancel and rollback order
+- `order.placed` – published on order placement
+- `order.cancelled` – published on cancellation
+- `payment.failed` – consumed to trigger rollback
+- `order.retry` – optional retry topic
 
 ---
 
-## 🔁 Retry & Resilience
+## 🛡️ Retry & Resilience
 
-- `ProductClient` uses **Resilience4j Retry** + **CircuitBreaker** with fallback
-- **RollbackRetryScheduler** retries inventory rollback if initial attempt fails (e.g., service down)
-- **OrderExpiryScheduler** auto-cancels unpaid orders after TTL
+- `ProductClient` uses **Resilience4j Retry** + **CircuitBreaker**
+- `RollbackRetryScheduler` retries inventory rollback
+- `OrderExpiryScheduler` auto-cancels unpaid orders after TTL
+- Kafka publishing uses RetryTemplate
 
 ---
 
@@ -97,41 +93,100 @@ All endpoints are secured with OAuth2 (JWT bearer). Admin-only endpoints require
 
 ---
 
-## 🧾 MDC Logs
+## 🔐 Security
 
-Every log line includes:
-```
-[requestId] [userId] LEVEL ClassName - Message
-```
+- OAuth2 JWT + Token Introspection
+- Admin-only endpoints protected by `@AdminOnly`
+- Internal service calls secured via role/scope-based claims
 
 ---
 
-## 🚀 Local Setup
+## 📬 Email Notifications
+
+- Sent via SendGrid for order confirmation/cancellation
+
+---
+
+## 📦 Run Locally
 
 ```bash
-# Start MySQL, Kafka, Zookeeper, Eureka Server, Auth Service
-# Set environment or application.properties
-
-cd order-service
+# Start MySQL, Redis, Kafka, Eureka, Auth
 ./mvnw clean install
 java -jar target/order-service-0.0.1-SNAPSHOT.jar
 ```
 
-Or use Docker/Docker Compose if configured.
+---
+
+
+## 📦 Docker
+
+```bash
+docker build -t your-username/order-service .
+```
 
 ---
 
-## 🧠 Future Enhancements
+## 🧪 Test Coverage
 
-- 🔐 Enforce JWT scopes/claims in fine-grained manner (e.g., `SCOPE_ORDER_WRITE`)
-- 🧪 Add full integration test suite using Testcontainers
-- 🧾 Invoice generation and email attachment
-- 📩 Retry Kafka publishing via outbox pattern
-- 💼 Switch to Flyway for DB migrations (currently using `ddl-auto=update`)
-- 📬 Email notifications for status changes (e.g., shipped/delivered)
-- 📦 Automatic order packing/delivery simulation via Kafka events
+Includes:
+- Unit tests (Service Layer)
+- Integration tests (Web Layer + Kafka + DB)
+- Retry logic and scheduler testing
+
+```bash
+mvn test
+```
 
 ---
 
-## 📂 Author
-Built by Aayush Kumar for a production-grade backend microservices system.
+## 🔍 Redis Cache
+
+- Redis used for token introspection caching
+
+---
+
+## 📂 Directory Structure
+
+```
+order-service/
+├── configs/
+├── controllers/
+├── dtos/
+├── models/
+├── repositories/
+├── services/
+├── schedulers/
+├── kafka/
+├── security/
+├── utils/
+├── resources/
+│   ├── application.properties
+├── Dockerfile
+├── pom.xml
+└── README.md
+```
+
+---
+
+## 📚 Swagger UI
+
+Visit [http://localhost:8083/swagger-ui.html](http://localhost:8083/swagger-ui.html)
+
+---
+
+## 🔮 Future Enhancements
+
+- 🔧 Flyway DB migrations
+- 🔧 Order invoicing & attachments
+- 🔧 DLQ Kafka monitoring with alerts
+- 🔧 Inventory syncing reconciliation
+- 🔧 Global exception mapping improvements
+- 🔧 Outbox pattern for Kafka reliability
+- 🔧 UI-driven order analytics dashboards
+- 🔧 Email notifications for status changes (e.g., shipped/delivered)
+
+---
+
+## ✅ Status
+
+**Production-ready and integrated with all services (Auth, Payment, Product Catalog).**

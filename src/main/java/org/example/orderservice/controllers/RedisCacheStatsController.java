@@ -1,5 +1,6 @@
 package org.example.orderservice.controllers;
 
+import org.example.orderservice.security.AdminOnly;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,6 +20,7 @@ public class RedisCacheStatsController {
     @Autowired private RedisTemplate<String, Object> redisTemplate;
 
     @GetMapping
+    @AdminOnly
     public Map<String, Object> getCacheStats() {
         Set<String> keys = redisTemplate.keys("*");
         Map<String, Object> stats = new HashMap<>();
