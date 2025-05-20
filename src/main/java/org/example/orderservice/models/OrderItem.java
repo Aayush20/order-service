@@ -34,6 +34,10 @@ public class OrderItem extends BaseEntity {
         this.quantity = quantity;
     }
 
+    public OrderItem(long l, int i, String product, BigDecimal bigDecimal, String inr) {
+        super();
+    }
+
     public Long getProductId() {
         return productId;
     }

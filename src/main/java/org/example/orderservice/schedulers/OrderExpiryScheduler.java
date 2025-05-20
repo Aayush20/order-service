@@ -32,6 +32,10 @@ public class OrderExpiryScheduler {
     @Value("${order.expiry.minutes}")
     private int expiryMinutes;
 
+    public void setExpiryMinutes(int expiryMinutes) {
+        this.expiryMinutes = expiryMinutes;
+    }
+
     public OrderExpiryScheduler(OrderRepository orderRepository,
                                 OrderAuditLogRepository auditLogRepository,
                                 InventoryClient inventoryClient,

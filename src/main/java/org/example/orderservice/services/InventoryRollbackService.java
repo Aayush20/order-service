@@ -77,5 +77,24 @@ public class InventoryRollbackService {
 
         rollbackInventory(order, reason);
     }
+
+    public void retryFailedTasks() {
+        List<InventoryRollbackTask> failedTasks = rollbackTaskRepository.findAll(); // You can filter on retry count or time
+        for (InventoryRollbackTask task : failedTasks) {
+            try {
+                RollbackStockRequestDto dto = objectMapper.readValue(task.getPayload(), RollbackStockRequestDto.class);
+                inventoryClient.rollbackStock(dto);
+
+                rollbackTaskRepository.delete(task); // Success: clean up
+                log.info("✅ Retried rollback for order {}", task.getOrderId());
+            } catch (Exception ex) {
+                task.setRetryCount(task.getRetryCount() + 1);
+                task.setLastTriedAt(Instant.now());
+                rollbackTaskRepository.save(task);
+                log.warn("❌ Retry failed for rollback order {}: {}", task.getOrderId(), ex.getMessage());
+            }
+        }
+    }
+
 }
 

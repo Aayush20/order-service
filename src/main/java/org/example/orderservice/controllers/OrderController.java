@@ -1,6 +1,7 @@
 package org.example.orderservice.controllers;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micrometer.core.annotation.Counted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -128,6 +129,7 @@ public class OrderController {
             }
     )
     @PostMapping("/placeorder")
+    @Counted(value = "orders.placed.total", description = "Total number of orders placed")
     public ResponseEntity<OrderResponseDTO> placeOrder(Authentication authentication,
                                                        @RequestBody @Valid OrderRequestDTO orderRequest,
                                                        @RequestHeader("Authorization") String tokenHeader) throws IOException {

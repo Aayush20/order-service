@@ -1,17 +1,13 @@
 package org.example.orderservice.services;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.example.orderservice.clients.InventoryClient;
 import org.example.orderservice.clients.ProductClient;
 import org.example.orderservice.clients.UserProfileClient;
-import org.example.orderservice.kafka.KafkaPublisher;
 import org.example.orderservice.dtos.*;
+import org.example.orderservice.kafka.KafkaPublisher;
 import org.example.orderservice.models.*;
-import org.example.orderservice.repositories.CartRepository;
-import org.example.orderservice.repositories.InventoryRollbackTaskRepository;
-import org.example.orderservice.repositories.OrderAuditLogRepository;
-import org.example.orderservice.repositories.OrderRepository;
+import org.example.orderservice.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
@@ -39,174 +35,167 @@ public class OrderServiceTest {
     @InjectMocks private OrderService orderService;
 
     @BeforeEach
-    void setUp() {
+    void init() {
         MockitoAnnotations.openMocks(this);
         orderService = new OrderService(
-                cartRepository, orderRepository, productClient,
-                kafkaPublisher, auditLogRepository,
-                new SimpleMeterRegistry(), emailService,
-                inventoryClient, rollbackTaskRepository, userProfileClient
+                cartRepository,
+                orderRepository,
+                productClient,
+                kafkaPublisher,
+                auditLogRepository,
+                new SimpleMeterRegistry(),
+                emailService,
+                inventoryClient,
+                rollbackTaskRepository,
+                userProfileClient
         );
     }
 
     @Test
-    void shouldAddItemToCartSuccessfully() {
+    void shouldAddToCart_whenValidProductProvided() {
         String userId = "user123";
         Long productId = 1L;
-        CartItemRequestDTO request = new CartItemRequestDTO(productId, 2);
+        CartItemRequestDTO req = new CartItemRequestDTO(productId, 2);
+        ProductDTO productDTO = new ProductDTO(productId, "Product", BigDecimal.valueOf(999), "INR");
 
-        ProductDTO product = new ProductDTO(productId, "Mock Product", BigDecimal.valueOf(100), "INR");
-
-        when(productClient.getProductDetails(productId)).thenReturn(product);
+        when(productClient.getProductDetails(productId)).thenReturn(productDTO);
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(cartRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Cart result = orderService.addToCart(userId, request);
+        Cart result = orderService.addToCart(userId, req);
 
         assertNotNull(result);
-        assertThat(result.getItems()).hasSize(1);
-        assertEquals("Mock Product", result.getItems().get(0).getProductName());
+        assertEquals(1, result.getItems().size());
+        assertEquals("Product", result.getItems().get(0).getProductName());
     }
 
     @Test
-    void shouldThrowWhenProductIsUnavailable() {
+    void shouldThrow_whenProductIsUnavailable() {
         String userId = "user123";
         Long productId = 1L;
-        CartItemRequestDTO request = new CartItemRequestDTO(productId, 1);
+        CartItemRequestDTO req = new CartItemRequestDTO(productId, 1);
+        ProductDTO unavailable = new ProductDTO(productId, "UNAVAILABLE", BigDecimal.ZERO, "NA");
 
-        ProductDTO fallback = new ProductDTO(productId, "UNAVAILABLE", BigDecimal.ZERO, "N/A");
-        when(productClient.getProductDetails(productId)).thenReturn(fallback);
+        when(productClient.getProductDetails(productId)).thenReturn(unavailable);
 
-        Exception ex = assertThrows(RuntimeException.class, () ->
-                orderService.addToCart(userId, request)
-        );
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> orderService.addToCart(userId, req));
 
         assertTrue(ex.getMessage().contains("Product is temporarily unavailable"));
     }
 
     @Test
-    void shouldPlaceOrderSuccessfullyWithUserProfile() throws IOException {
+    void shouldPlaceOrder_whenCartAndUserProfileValid() throws IOException {
         String userId = "user123";
-        String token = "mock-token";
-
+        String token = "token-abc";
         Cart cart = new Cart(userId);
-        cart.addItem(new CartItem(1L, 2, "Product", BigDecimal.valueOf(100), "INR"));
-
-        OrderRequestDTO request = new OrderRequestDTO(); // address not required from request anymore
+        cart.addItem(new CartItem(1L, 2, "Phone", BigDecimal.valueOf(500), "INR"));
 
         UserProfileDTO profile = new UserProfileDTO();
         profile.setEmail("user123@example.com");
-        UserProfileDTO.AddressDTO addressDTO = new UserProfileDTO.AddressDTO();
-        addressDTO.setStreet("123 Street");
-        addressDTO.setCity("City");
-        addressDTO.setState("State");
-        addressDTO.setZipCode("123456");
-        profile.setAddress(addressDTO);
+        UserProfileDTO.AddressDTO address = new UserProfileDTO.AddressDTO();
+        address.setCity("Delhi"); address.setStreet("MG Road");
+        address.setState("Delhi"); address.setZipCode("110001");
+        profile.setAddress(address);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
         when(userProfileClient.getUserProfile(token)).thenReturn(profile);
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Order result = orderService.placeOrder(userId, request, token);
+        Order result = orderService.placeOrder(userId, new OrderRequestDTO(), token);
 
         assertNotNull(result);
-        assertEquals(1, result.getOrderItems().size());
-        verify(kafkaPublisher).publishOrderPlaced(any());
-        verify(auditLogRepository).save(any());
+        assertEquals(OrderStatus.PLACED, result.getStatus());
         verify(emailService).sendEmail(eq("user123@example.com"), any(), any());
+        verify(kafkaPublisher).publishOrderPlaced(any());
     }
-
     @Test
-    void shouldThrowWhenPlacingOrderWithEmptyCart() {
+    void shouldThrow_whenCartIsEmptyDuringOrderPlacement() {
         String userId = "user123";
-        String token = "token";
+        String token = "mock-token";
         Cart emptyCart = new Cart(userId);
-        OrderRequestDTO request = new OrderRequestDTO();
-
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(emptyCart));
 
-        Exception ex = assertThrows(RuntimeException.class, () ->
-                orderService.placeOrder(userId, request, token)
-        );
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> orderService.placeOrder(userId, new OrderRequestDTO(), token));
 
         assertEquals("Cart is empty", ex.getMessage());
     }
 
     @Test
-    void shouldCancelOrder() throws JsonProcessingException {
+    void shouldCancelOrder_whenOrderIsPlaced() throws IOException {
+        Long orderId = 101L;
         String userId = "user123";
-        Long orderId = 42L;
 
         Order order = new Order();
         order.setId(orderId);
         order.setUserId(userId);
         order.setStatus(OrderStatus.PLACED);
-        order.setOrderItems(List.of(new OrderItem(1L, 2)));
+        order.addOrderItem(new OrderItem(1L, 2));
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any())).thenReturn(order);
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Order result = orderService.cancelOrder(orderId, userId);
 
         assertEquals(OrderStatus.CANCELLED, result.getStatus());
-        verify(kafkaPublisher).publishOrderCancelled(order);
-        verify(auditLogRepository).save(any());
         verify(inventoryClient).rollbackStock(any());
+        verify(auditLogRepository).save(any());
         verify(rollbackTaskRepository).save(any());
+        verify(kafkaPublisher).publishOrderCancelled(order);
     }
 
     @Test
-    void shouldThrowIfCancellingNonPlacedOrder() {
+    void shouldThrow_whenCancellingNonPlacedOrder() {
+        Long orderId = 999L;
         String userId = "user123";
-        Long orderId = 42L;
 
         Order order = new Order();
         order.setId(orderId);
         order.setUserId(userId);
-        order.setStatus(OrderStatus.SHIPPED);
+        order.setStatus(OrderStatus.DELIVERED);
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-        Exception ex = assertThrows(RuntimeException.class, () ->
-                orderService.cancelOrder(orderId, userId)
-        );
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> orderService.cancelOrder(orderId, userId));
 
         assertTrue(ex.getMessage().contains("Only placed orders can be cancelled"));
     }
 
     @Test
-    void shouldUpdateOrderStatusToDelivered() {
-        Long orderId = 100L;
-        String adminUser = "admin";
+    void shouldUpdateStatusToDelivered_whenCalledByAdmin() {
+        Long orderId = 77L;
+        String admin = "admin";
 
         Order order = new Order();
         order.setId(orderId);
-        order.setStatus(OrderStatus.PLACED);
+        order.setStatus(OrderStatus.PROCESSING);
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Order result = orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED, adminUser);
+        Order result = orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED, admin);
 
         assertEquals(OrderStatus.DELIVERED, result.getStatus());
         verify(auditLogRepository).save(any());
     }
 
     @Test
-    void shouldThrowWhenUpdatingToShippedManually() {
-        Long orderId = 100L;
-        String adminUser = "admin";
+    void shouldThrow_whenTryingToUpdateStatusToShippedManually() {
+        Long orderId = 99L;
+        String admin = "admin";
 
         Order order = new Order();
         order.setId(orderId);
-        order.setStatus(OrderStatus.PLACED);
+        order.setStatus(OrderStatus.PROCESSING);
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-        Exception ex = assertThrows(RuntimeException.class, () ->
-                orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED, adminUser)
-        );
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED, admin));
 
         assertTrue(ex.getMessage().contains("SHIPPED status is set automatically"));
     }
+
 }
