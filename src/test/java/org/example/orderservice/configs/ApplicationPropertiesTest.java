@@ -1,8 +1,8 @@
+
 package org.example.orderservice.configs;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ApplicationPropertiesTest {
@@ -27,7 +27,10 @@ public class ApplicationPropertiesTest {
     private static class TestConfig {
         @org.springframework.context.annotation.Bean
         public ApplicationProperties applicationProperties() {
-            return new ApplicationProperties();
+            ApplicationProperties properties = new ApplicationProperties();
+            properties.setKafkaTopicPlaced("order.placed");
+            properties.setKafkaTopicCancelled("order.cancelled");
+            return properties;
         }
     }
 }

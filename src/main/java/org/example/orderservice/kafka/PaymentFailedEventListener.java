@@ -37,8 +37,9 @@ public class PaymentFailedEventListener {
     public void handlePaymentFailedEvent(PaymentFailedEvent event) {
         logger.warn("📩 Received payment.failed event for orderId={} reason={}", event.getOrderId(), event.getFailureReason());
 
+        Long orderId = null;
         try {
-            Long orderId = Long.parseLong(event.getOrderId());
+            orderId = Long.parseLong(event.getOrderId());
             Order order = orderRepository.findById(orderId)
                     .orElseThrow(() -> new RuntimeException("Order not found: " + event.getOrderId()));
 
@@ -52,14 +53,29 @@ public class PaymentFailedEventListener {
 
             rollbackService.rollbackInventory(order, event.getFailureReason());
 
-        } catch (Exception e) {
-            logger.error("❌ Error handling payment.failed event: {}", e.getMessage(), e);
+        } catch (NumberFormatException e) {
+            logger.error("❌ Invalid orderId format: {}", event.getOrderId());
+
             try {
                 InventoryRollbackTask task = new InventoryRollbackTask();
-                task.setOrderId(Long.parseLong(event.getOrderId()));
+                task.setOrderId(-1L); // use a default/fallback invalid ID
                 task.setPayload(objectMapper.writeValueAsString(event));
                 task.setRetryCount(0);
-                task.setLastTriedAt(Instant.from(LocalDateTime.now()));
+                task.setLastTriedAt(Instant.now());
+                rollbackTaskRepository.save(task);
+            } catch (Exception ex) {
+                logger.error("⚠️ Failed to save rollback task for invalid ID: {}", ex.getMessage());
+            }
+
+        } catch (Exception e) {
+            logger.error("❌ Error handling payment.failed event: {}", e.getMessage(), e);
+
+            try {
+                InventoryRollbackTask task = new InventoryRollbackTask();
+                task.setOrderId(orderId != null ? orderId : -1L);
+                task.setPayload(objectMapper.writeValueAsString(event));
+                task.setRetryCount(0);
+                task.setLastTriedAt(Instant.now());
                 rollbackTaskRepository.save(task);
             } catch (Exception ex) {
                 logger.error("⚠️ Failed to save rollback task: {}", ex.getMessage());

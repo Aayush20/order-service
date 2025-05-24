@@ -1,3 +1,4 @@
+
 package org.example.orderservice.clients;
 
 import org.example.orderservice.dtos.ProductDTO;
@@ -35,7 +36,7 @@ class ProductClientTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getName()).isEqualTo("Test Product");
-        assertThat(result.getPrice()).isEqualTo(BigDecimal.valueOf(100));
+        assertThat(result.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(100));
         assertThat(result.getCurrency()).isEqualTo("INR");
     }
 
@@ -48,7 +49,7 @@ class ProductClientTest {
         assertThat(fallback).isNotNull();
         assertThat(fallback.getProductId()).isEqualTo(99L);
         assertThat(fallback.getName()).isEqualTo("UNAVAILABLE");
-        assertThat(fallback.getPrice()).isEqualTo(BigDecimal.ZERO);
+        assertThat(fallback.getPrice()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(fallback.getCurrency()).isEqualTo("N/A");
     }
 }

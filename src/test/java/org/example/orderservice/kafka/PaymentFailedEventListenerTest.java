@@ -90,7 +90,9 @@ class PaymentFailedEventListenerTest {
 
         listener.handlePaymentFailedEvent(event);
 
+        // ✅ fallback logic should store rollback task with orderId = -1
+        verify(rollbackTaskRepository).save(any());
         verify(rollbackService, never()).rollbackInventory(any(), any());
-        verify(rollbackTaskRepository, never()).save(any());
     }
+
 }

@@ -9,7 +9,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -26,7 +25,7 @@ class RollbackRetryControllerTest {
     @Autowired private InventoryRollbackService rollbackService;
     @Autowired private TokenService tokenService;
 
-    private final String token = "Bearer xyz";
+    private final String token = "Bearer internal-token";
 
     @TestConfiguration
     static class TestConfig {
@@ -35,17 +34,15 @@ class RollbackRetryControllerTest {
     }
 
     @Test
-    void shouldTriggerRollbackRetryInternally() throws Exception {
+    void shouldAllowInternalScopeToTriggerRollbackRetry() throws Exception {
         TokenIntrospectionResponseDTO tokenDto = new TokenIntrospectionResponseDTO();
-        tokenDto.setSub("order-service");
+        tokenDto.setSub("internal-service");
         tokenDto.setScopes(List.of("internal"));
 
         when(tokenService.introspect(token)).thenReturn(tokenDto);
         doNothing().when(rollbackService).retryFailedTasks();
 
-        mockMvc.perform(post("/order/internal/rollback-retry")
-                        .header("Authorization", token)
-                        .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post("/order/internal/rollback-retry").header("Authorization", token))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Retry triggered"));
     }
